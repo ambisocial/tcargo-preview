@@ -112,11 +112,17 @@ a { color: var(--orange); }
   min-height: 44px;
 }
 
+.wrap-app { padding-bottom: 40px; }
+.page {
+  font-size: 28px;
+  letter-spacing: -0.03em;
+  margin: 0 0 16px;
+}
 .nums {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-bottom: 22px;
+  margin: 16px 0 22px;
 }
 .num {
   background: var(--card);
@@ -240,4 +246,16 @@ h2 {
 .err { color: var(--danger); font-size: 13px; margin: 8px 0 0; }
 .okmsg { color: var(--ok); font-size: 13px; margin: 8px 0 0; }
 .hidden { display: none; }
-.actions { display: flex; gap: 8px; align-items: center; }
+.chip-btn {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 999px;
+  min-height: 40px;
+  padding: 0 14px;
+  color: var(--muted);
+}
+.chip-btn.on { background: var(--orange); color: #140a00; border-color: transparent; }
+.tap { width: 100%; text-align: left; cursor: pointer; display: block; }
+.empty { color: var(--muted); font-size: 16px; margin: 18px 0; }
+.not { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
+.readonly { margin: 0; font-size: 18px; }
