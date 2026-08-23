@@ -89,7 +89,7 @@ function previewApi(path, opts = {}) {
       throw err;
     }
     c.status = "não emitida";
-    c.cte_erro = "Preview. Sem emissor. No Hostinger a nota volta aqui.";
+    c.cte_erro = "A nota não saiu. Tenta de novo.";
     c.cte_xml = "";
     saveStore(s);
     const err = new Error(c.cte_erro);
@@ -190,7 +190,6 @@ function appScreen(dia) {
         <div class="brand"><i></i> Tcargo</div>
         <button class="linkish" id="sair">Sair</button>
       </div>
-      <div class="banner">Preview — sem nota fiscal. Hostinger é o ar de produto.</div>
       <div class="nums">
         <div class="num"><strong>${dia.numeros.cargas_do_dia}</strong><span>cargas do dia</span></div>
         <div class="num"><strong>${dia.numeros.caminhoes_na_rua}</strong><span>caminhões na rua</span></div>
@@ -202,10 +201,7 @@ function appScreen(dia) {
           <div class="field"><label for="origem">Origem</label><input id="origem" name="origem" placeholder="Campinas/SP" required /></div>
           <div class="field"><label for="destino">Destino</label><input id="destino" name="destino" placeholder="Santos/SP" required /></div>
         </div>
-        <div class="row">
-          <div class="field"><label for="valor">Valor</label><input id="valor" name="valor" inputmode="decimal" placeholder="2400" required /></div>
-          <div class="field"><label for="status">Status</label><select id="status" name="status">${statusOpts}</select></div>
-        </div>
+        <div class="field"><label for="valor">Valor</label><input id="valor" name="valor" inputmode="decimal" placeholder="2400" required /></div>
         <div class="field">
           <label for="placa">Placa</label>
           <select id="placa" name="placa"><option value="">sem placa</option>${frotaOpts}</select>
@@ -328,7 +324,7 @@ async function onNova(ev) {
         origem: $("#origem").value,
         destino: $("#destino").value,
         valor: $("#valor").value,
-        status: $("#status").value,
+        status: "aberta",
         placa: $("#placa").value,
       },
     });
