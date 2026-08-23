@@ -1,3 +1,41 @@
+const PREVIEW = /github\.io$/.test(location.hostname) || location.protocol === "file:";
+
+const SEED = {
+  viagens: [
+    { id: 1, origem: "Americana", destino: "Campinas", valor: 2400, placa: "RTA1A23", amostra: true },
+    { id: 2, origem: "Limeira", destino: "Santos", valor: 3800, placa: "QWE4B56", amostra: false },
+  ],
+};
+
+function previewApi(path) {
+  const raw = path.split("?")[0];
+  if (raw.startsWith("/api/viagens/")) {
+    const id = Number(raw.split("/").pop());
+    const v = SEED.viagens.find((x) => x.id === id);
+    if (!v) {
+      const err = new Error("Viagem não encontrada.");
+      err.status = 404;
+      throw err;
+    }
+    return v;
+  }
+  if (raw === "/api/historico") {
+    const viagens = SEED.viagens;
+    return {
+      viagens,
+      numeros: {
+        viagens: viagens.length,
+        cobrado: viagens.reduce((a, v) => a + v.valor, 0),
+        caiu: 2400,
+        deve_pro_motorista: 800,
+      },
+    };
+  }
+  const err = new Error("Algo deu errado.");
+  err.status = 404;
+  throw err;
+}
+
 const BASE = "/tcargo";
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -6,6 +44,7 @@ const money = (n) =>
   Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 async function api(path) {
+  if (PREVIEW) return previewApi(path);
   const res = await fetch(`${BASE}${path}`, { credentials: "same-origin" });
   const text = await res.text();
   let data = null;
@@ -62,7 +101,7 @@ function periodBar() {
   ]
     .map(
       ([id, label]) =>
-        `<button type="button" class="chip-btn ${ui.periodo === id ? "on" : ""}" data-periodo="${id}">${label}</button>`,
+        `<button type="button" class="chip-btn ${ui.periodo === id ? "on" : ""}" data-periodo="${id}">${id === "periodo" ? "Período" : label}</button>`,
     )
     .join("");
   const range =
