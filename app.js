@@ -61,6 +61,7 @@ function shell(name, body) {
     </header>
     ${menu()}
     ${periodBar()}
+    <p class="amostra">Amostra</p>
     <main class="main">${body}</main>
     <div class="toast" id="toast"></div>
   `;
