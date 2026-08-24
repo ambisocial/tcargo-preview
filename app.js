@@ -157,7 +157,7 @@ function paint() {
   const view = { historico, viagens, viagem, notas, financeiro, acerto, frota }[ui.tela];
   root.innerHTML = view();
 
-  $("#periodo").onchange = (e) => { ui.periodo = e.target.value; paint(); };
+  const per = $("#periodo"); if (per) per.onchange = (e) => { ui.periodo = e.target.value; paint(); };
   root.querySelectorAll("[data-tela]").forEach((b) => {
     b.onclick = () => { ui.tela = b.dataset.tela; ui.mais = false; paint(); };
   });
