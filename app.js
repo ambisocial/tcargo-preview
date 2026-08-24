@@ -1,267 +1,180 @@
-const money = (n) =>
-  Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-const VIAGENS = [
-  { id: 1, origem: "Americana", destino: "Campinas", valor: 2400, placa: "RTA1A23", motorista: "José Silva" },
-  { id: 2, origem: "Limeira", destino: "Santos", valor: 3800, placa: "QWE4B56", motorista: "Ana Costa" },
-  { id: 3, origem: "Piracicaba", destino: "Jundiaí", valor: 1900, placa: "FGH7C89", motorista: "José Silva" },
-];
-
-const NOTAS = [
-  { tipo: "CT-e", chave: "352608...", viagem: "Americana → Campinas", status: "não emitida" },
-  { tipo: "MDF-e", chave: "352608...", viagem: "Americana → Campinas", status: "não emitida" },
-];
-
-const FROTAS = [
-  { placa: "RTA1A23" },
-  { placa: "QWE4B56" },
-  { placa: "FGH7C89" },
-];
-
-const ui = { tela: "historico", periodo: "hoje", menu: false, viagemId: null, de: "", ate: "" };
+const ui = { tela: "historico", periodo: "semana", tab: "cte", mais: false };
 
 function $(sel, el) { return (el || document).querySelector(sel); }
 
-function periodBar() {
-  const chips = [
-    ["hoje", "Hoje"],
-    ["semana", "Semana"],
-    ["mes", "Mês"],
-    ["periodo", "Período"],
-  ]
-    .map(([id, label]) => `<button type="button" class="chip ${ui.periodo === id ? "on" : ""}" data-periodo="${id}">${label}</button>`)
-    .join("");
-  const dates =
-    ui.periodo === "periodo"
-      ? `<div class="dates"><input id="de" type="date" value="${ui.de}" /><input id="ate" type="date" value="${ui.ate}" /></div>`
-      : "";
-  return `<div class="period">${chips}</div>${dates}`;
+function periodBox() {
+  return `<div class="period">
+    <div style="flex:1">
+      <label>Período</label>
+      <select id="periodo">
+        <option value="hoje" ${ui.periodo === "hoje" ? "selected" : ""}>Hoje</option>
+        <option value="semana" ${ui.periodo === "semana" ? "selected" : ""}>18 ago — 23 ago</option>
+        <option value="mes" ${ui.periodo === "mes" ? "selected" : ""}>Mês</option>
+      </select>
+    </div>
+  </div>`;
 }
 
-function menu() {
-  const items = [
-    ["historico", "Histórico"],
-    ["viagens", "Viagens"],
-    ["notas", "Notas"],
-    ["financeiro", "Financeiro"],
-    ["acerto", "Acerto"],
-    ["frota", "Frota"],
-  ];
-  return `<nav class="nav ${ui.menu ? "open" : ""}">${items
-    .map(([id, label]) => `<button type="button" class="${ui.tela === id || (ui.tela === "viagem" && id === "viagens") ? "on" : ""}" data-tela="${id}">${label}</button>`)
-    .join("")}</nav>`;
+function stamp() {
+  return `<div class="stamp">AMOSTRA</div>`;
 }
 
-function shell(name, body) {
+function shell(title, inner, opts) {
+  const back = opts && opts.back ? `<button type="button" class="back" id="voltar">‹</button>` : `<span class="word"><b>T</b>cargo</span>`;
   return `
-    <header class="top">
-      <button type="button" class="burger" id="menu" aria-label="Menu">☰</button>
-      <div class="brand"><i></i>Tcargo</div>
-      <div class="screen-name">${name}</div>
-    </header>
-    ${menu()}
-    ${periodBar()}
-    <p class="amostra">Amostra</p>
-    <main class="main">${body}</main>
-    <div class="toast" id="toast"></div>
-  `;
+    <div class="app">
+      <header class="head">${back}<h1>${title}</h1></header>
+      ${opts && opts.tabs ? opts.tabs : ""}
+      ${periodBox()}
+      <main class="main">${inner}${stamp()}</main>
+      <nav class="nav">
+        <button type="button" class="${ui.tela === "historico" ? "on" : ""}" data-tela="historico"><span class="ico">◷</span>Histórico</button>
+        <button type="button" class="${ui.tela === "viagem" || ui.tela === "viagens" ? "on" : ""}" data-tela="viagens"><span class="ico">⛟</span>Viagens</button>
+        <button type="button" class="${ui.tela === "notas" ? "on" : ""}" data-tela="notas"><span class="ico">▤</span>Notas</button>
+        <button type="button" class="${ui.tela === "financeiro" ? "on" : ""}" data-tela="financeiro"><span class="ico">$</span>Financeiro</button>
+        <button type="button" class="${ui.tela === "acerto" || ui.tela === "frota" ? "on" : ""}" id="mais"><span class="ico">•••</span>Mais</button>
+      </nav>
+      <div class="sheet ${ui.mais ? "open" : ""}" id="sheet">
+        <div class="sheet-in">
+          <button type="button" data-tela="acerto">Acerto</button>
+          <button type="button" data-tela="frota">Frota</button>
+          <button type="button" id="fecha-mais">Fechar</button>
+        </div>
+      </div>
+    </div>`;
 }
 
-function empty() {
-  return `<p class="empty">Nada nesse período.</p>`;
-}
-
-function filtered() {
-  if (ui.periodo === "periodo" && ui.de && ui.ate && ui.de > ui.ate) return [];
-  return VIAGENS;
+function amostraRows(n, cols) {
+  return Array.from({ length: n }, () => `<tr>${cols.map(() => "<td>AMOSTRA</td>").join("")}</tr>`).join("");
 }
 
 function historico() {
-  const rows = filtered();
-  if (!rows.length) return shell("Histórico", empty());
-  const cobrado = rows.reduce((a, v) => a + v.valor, 0);
-  const body = `
+  const inner = `
     <div class="nums">
-      <div class="num"><strong>${rows.length}</strong><span>viagens</span></div>
-      <div class="num"><strong>${money(cobrado)}</strong><span>cobrado</span></div>
-      <div class="num"><strong>${money(2400)}</strong><span>caiu</span></div>
-      <div class="num"><strong>${money(800)}</strong><span>deve</span></div>
+      <div class="num"><span>Viagens</span><strong>—</strong></div>
+      <div class="num"><span>Cobrado</span><strong>—</strong></div>
+      <div class="num"><span>Caiu</span><strong>—</strong></div>
+      <div class="num"><span>Deve</span><strong>—</strong></div>
     </div>
-    <h1>Viagens</h1>
+    <h2 style="margin-top:16px">Viagens</h2>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Origem</th><th>Destino</th><th>Valor</th><th>Placa</th></tr></thead>
-        <tbody>
-          ${rows
-            .map(
-              (v) =>
-                `<tr class="tap" data-viagem="${v.id}"><td>${v.origem}</td><td>${v.destino}</td><td>${money(v.valor)}</td><td>${v.placa}</td></tr>`,
-            )
-            .join("")}
-        </tbody>
+        <tbody>${amostraRows(3, [1, 1, 1, 1])}</tbody>
       </table>
-    </div>
-  `;
-  return shell("Histórico", body);
+    </div>`;
+  return shell("Histórico", inner);
 }
 
 function viagens() {
-  const rows = filtered();
-  if (!rows.length) return shell("Viagens", empty());
-  const body = `
-    <h1>Viagens</h1>
+  const inner = `
     <div class="table-wrap">
       <table>
         <thead><tr><th>Origem</th><th>Destino</th><th>Valor</th><th>Placa</th><th>Motorista</th></tr></thead>
         <tbody>
-          ${rows
-            .map(
-              (v) =>
-                `<tr class="tap" data-viagem="${v.id}"><td>${v.origem}</td><td>${v.destino}</td><td>${money(v.valor)}</td><td>${v.placa}</td><td>${v.motorista}</td></tr>`,
-            )
-            .join("")}
+          <tr class="tap" data-abrir-viagem="1"><td>AMOSTRA</td><td>AMOSTRA</td><td>—</td><td>AMOSTRA</td><td>AMOSTRA</td></tr>
+          <tr class="tap" data-abrir-viagem="1"><td>AMOSTRA</td><td>AMOSTRA</td><td>—</td><td>AMOSTRA</td><td>AMOSTRA</td></tr>
         </tbody>
       </table>
-    </div>
-  `;
-  return shell("Viagens", body);
+    </div>`;
+  return shell("Viagens", inner);
 }
 
 function viagem() {
-  const v = VIAGENS.find((x) => x.id === ui.viagemId) || VIAGENS[0];
-  const body = `
-    <h1>Viagem</h1>
-    <article class="card">
-      <div class="field"><label>Origem</label><p>${v.origem}</p></div>
-      <div class="field"><label>Destino</label><p>${v.destino}</p></div>
-      <div class="field"><label>Valor</label><p>${money(v.valor)}</p></div>
-      <div class="field"><label>Placa</label><p>${v.placa}</p></div>
-      <div class="field"><label>Motorista</label><p>${v.motorista}</p></div>
-    </article>
-    <button type="button" class="btn" id="emitir">Emitir nota</button>
-    <p class="note">Mock. Não emite.</p>
-  `;
-  return shell("Viagem", body);
+  const inner = `
+    <div class="fields">
+      <div class="field"><label>Origem</label><p>AMOSTRA</p></div>
+      <div class="field"><label>Destino</label><p>AMOSTRA</p></div>
+      <div class="field"><label>Valor</label><p>—</p></div>
+      <div class="field"><label>Placa</label><p>AMOSTRA</p></div>
+      <div class="field"><label>Motorista</label><p>AMOSTRA</p></div>
+    </div>
+    <button type="button" class="cta" id="emitir">Emitir nota</button>
+    <p class="note">Não emite. Amostra.</p>
+    <div class="toast" id="toast">Não emitiu. Amostra.</div>`;
+  return shell("Viagem", inner, { back: true });
 }
 
 function notas() {
-  const body = `
-    <h1>Notas</h1>
+  const tabs = `<div class="tabs">
+    <button type="button" class="${ui.tab === "cte" ? "on" : ""}" data-tab="cte">CT-e</button>
+    <button type="button" class="${ui.tab === "mdfe" ? "on" : ""}" data-tab="mdfe">MDF-e</button>
+  </div>`;
+  const inner = `
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Tipo</th><th>Viagem</th><th>Status</th></tr></thead>
-        <tbody>
-          ${NOTAS.map((n) => `<tr><td>${n.tipo}</td><td>${n.viagem}</td><td>${n.status}</td></tr>`).join("")}
-        </tbody>
+        <thead><tr><th>Número</th><th>Placa</th><th>Tipo</th><th>Situação</th></tr></thead>
+        <tbody>${amostraRows(4, [1, 1, 1, 1])}</tbody>
       </table>
     </div>
-    <button type="button" class="btn" id="emitir">Emitir nota</button>
-    <p class="note">Mock. Não emite. Sem portal.</p>
-  `;
-  return shell("Notas", body);
+    <button type="button" class="cta" id="emitir">Emitir nota</button>
+    <p class="note">Não emite. Sem portal. Amostra.</p>
+    <div class="toast" id="toast">Não emitiu. Amostra.</div>`;
+  return shell("Notas", inner, { tabs });
 }
 
 function financeiro() {
-  const body = `
+  const inner = `
     <div class="nums">
-      <div class="num"><strong>${money(8100)}</strong><span>cobrado</span></div>
-      <div class="num"><strong>${money(2400)}</strong><span>caiu</span></div>
+      <div class="num"><span>Cobrado</span><strong>—</strong></div>
+      <div class="num"><span>Caiu</span><strong>—</strong></div>
     </div>
-    <h1>Financeiro</h1>
+    <h2 style="margin-top:16px">Movimento</h2>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Viagem</th><th>Cobrado</th><th>Caiu</th></tr></thead>
-        <tbody>
-          <tr><td>Americana → Campinas</td><td>${money(2400)}</td><td>${money(2400)}</td></tr>
-          <tr><td>Limeira → Santos</td><td>${money(3800)}</td><td>${money(0)}</td></tr>
-          <tr><td>Piracicaba → Jundiaí</td><td>${money(1900)}</td><td>${money(0)}</td></tr>
-        </tbody>
+        <tbody>${amostraRows(3, [1, 1, 1])}</tbody>
       </table>
-    </div>
-  `;
-  return shell("Financeiro", body);
+    </div>`;
+  return shell("Financeiro", inner);
 }
 
 function acerto() {
-  const body = `
-    <h1>Acerto</h1>
+  const inner = `
     <div class="table-wrap">
       <table>
         <thead><tr><th>Motorista</th><th>Viagens</th><th>Deve</th></tr></thead>
-        <tbody>
-          <tr><td>José Silva</td><td>2</td><td>${money(500)}</td></tr>
-          <tr><td>Ana Costa</td><td>1</td><td>${money(300)}</td></tr>
-        </tbody>
+        <tbody>${amostraRows(2, [1, 1, 1])}</tbody>
       </table>
-    </div>
-  `;
-  return shell("Acerto", body);
+    </div>`;
+  return shell("Acerto", inner);
 }
 
 function frota() {
-  const body = `
-    <h1>Frota</h1>
+  const inner = `
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Placa</th></tr></thead>
-        <tbody>
-          ${FROTAS.map((f) => `<tr><td>${f.placa}</td></tr>`).join("")}
-        </tbody>
+        <thead><tr><th>Placa</th><th>Tipo</th><th>Situação</th></tr></thead>
+        <tbody>${amostraRows(3, [1, 1, 1])}</tbody>
       </table>
     </div>
-    <p class="note">1 a 5 placas.</p>
-  `;
-  return shell("Frota", body);
+    <p class="note">1 a 5 placas. Amostra.</p>`;
+  return shell("Frota", inner);
 }
 
 function paint() {
   const root = document.getElementById("app");
-  const view = {
-    historico,
-    viagens,
-    viagem,
-    notas,
-    financeiro,
-    acerto,
-    frota,
-  }[ui.tela];
+  const view = { historico, viagens, viagem, notas, financeiro, acerto, frota }[ui.tela];
   root.innerHTML = view();
 
-  $("#menu").onclick = () => {
-    ui.menu = !ui.menu;
-    paint();
-  };
-  root.querySelectorAll("[data-tela]").forEach((btn) => {
-    btn.onclick = () => {
-      ui.tela = btn.dataset.tela;
-      ui.menu = false;
-      ui.viagemId = null;
-      paint();
-    };
+  $("#periodo").onchange = (e) => { ui.periodo = e.target.value; paint(); };
+  root.querySelectorAll("[data-tela]").forEach((b) => {
+    b.onclick = () => { ui.tela = b.dataset.tela; ui.mais = false; paint(); };
   });
-  root.querySelectorAll("[data-periodo]").forEach((btn) => {
-    btn.onclick = () => {
-      ui.periodo = btn.dataset.periodo;
-      paint();
-    };
+  $("#mais") && ($("#mais").onclick = () => { ui.mais = !ui.mais; paint(); });
+  $("#fecha-mais") && ($("#fecha-mais").onclick = () => { ui.mais = false; paint(); });
+  $("#voltar") && ($("#voltar").onclick = () => { ui.tela = "viagens"; paint(); });
+  root.querySelectorAll("[data-abrir-viagem]").forEach((row) => {
+    row.onclick = () => { ui.tela = "viagem"; paint(); };
   });
-  $("#de") && ($("#de").onchange = (e) => { ui.de = e.target.value; paint(); });
-  $("#ate") && ($("#ate").onchange = (e) => { ui.ate = e.target.value; paint(); });
-  root.querySelectorAll("[data-viagem]").forEach((row) => {
-    row.onclick = () => {
-      ui.viagemId = Number(row.dataset.viagem);
-      ui.tela = "viagem";
-      ui.menu = false;
-      paint();
-    };
+  root.querySelectorAll("[data-tab]").forEach((b) => {
+    b.onclick = () => { ui.tab = b.dataset.tab; paint(); });
   });
   const emitir = $("#emitir");
   if (emitir) {
     emitir.onclick = () => {
       const t = $("#toast");
-      t.textContent = "Não emitiu. Mock.";
-      t.classList.add("show");
-      setTimeout(() => t.classList.remove("show"), 2200);
+      if (t) t.classList.add("show");
     };
   }
 }
