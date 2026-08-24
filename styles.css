@@ -199,3 +199,7 @@ tr:last-child td { border-bottom: 0; }
   font-size: 13px;
 }
 .toast.show { display: block; }
+
+.period-text { font-weight: 600; color: var(--navy); padding: 2px 0 4px; }
+.nav span { color: #fff; font-size: 10px; text-align: center; padding: 8px 0; }
+.nav span.on { color: var(--signal); font-weight: 700; }
