@@ -1,96 +1,26 @@
-const PREVIEW = /github\.io$/.test(location.hostname) || location.protocol === "file:";
-
-const SEED = {
-  viagens: [
-    { id: 1, origem: "Americana", destino: "Campinas", valor: 2400, placa: "RTA1A23", amostra: true },
-    { id: 2, origem: "Limeira", destino: "Santos", valor: 3800, placa: "QWE4B56", amostra: false },
-  ],
-};
-
-function previewApi(path) {
-  const raw = path.split("?")[0];
-  if (raw.startsWith("/api/viagens/")) {
-    const id = Number(raw.split("/").pop());
-    const v = SEED.viagens.find((x) => x.id === id);
-    if (!v) {
-      const err = new Error("Viagem não encontrada.");
-      err.status = 404;
-      throw err;
-    }
-    return v;
-  }
-  if (raw === "/api/historico") {
-    const viagens = SEED.viagens;
-    return {
-      viagens,
-      numeros: {
-        viagens: viagens.length,
-        cobrado: viagens.reduce((a, v) => a + v.valor, 0),
-        caiu: 2400,
-        deve_pro_motorista: 800,
-      },
-    };
-  }
-  const err = new Error("Algo deu errado.");
-  err.status = 404;
-  throw err;
-}
-
-const BASE = "/tcargo";
-
-const $ = (sel, el = document) => el.querySelector(sel);
-
 const money = (n) =>
   Number(n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-async function api(path) {
-  if (PREVIEW) return previewApi(path);
-  const res = await fetch(`${BASE}${path}`, { credentials: "same-origin" });
-  const text = await res.text();
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = { erro: text || "Falha de rede." };
-  }
-  if (!res.ok) {
-    const err = new Error(data?.erro || "Algo deu errado.");
-    err.status = res.status;
-    throw err;
-  }
-  return data;
-}
+const VIAGENS = [
+  { id: 1, origem: "Americana", destino: "Campinas", valor: 2400, placa: "RTA1A23", motorista: "José Silva" },
+  { id: 2, origem: "Limeira", destino: "Santos", valor: 3800, placa: "QWE4B56", motorista: "Ana Costa" },
+  { id: 3, origem: "Piracicaba", destino: "Jundiaí", valor: 1900, placa: "FGH7C89", motorista: "José Silva" },
+];
 
-const ui = {
-  tela: "landing",
-  periodo: "hoje",
-  de: "",
-  ate: "",
-  viagemId: null,
-};
+const NOTAS = [
+  { tipo: "CT-e", chave: "352608...", viagem: "Americana → Campinas", status: "não emitida" },
+  { tipo: "MDF-e", chave: "352608...", viagem: "Americana → Campinas", status: "não emitida" },
+];
 
-function qs() {
-  const p = new URLSearchParams({ periodo: ui.periodo });
-  if (ui.periodo === "periodo") {
-    if (ui.de) p.set("de", ui.de);
-    if (ui.ate) p.set("ate", ui.ate);
-  }
-  return `?${p.toString()}`;
-}
+const FROTAS = [
+  { placa: "RTA1A23" },
+  { placa: "QWE4B56" },
+  { placa: "FGH7C89" },
+];
 
-function landing() {
-  return `
-    <div class="wrap">
-      <div class="brand"><i></i> Tcargo</div>
-      <section class="hero">
-        <h1>Sábado você sabe se a semana pagou.</h1>
-        <p>qualquer período. Viagem, nota, acerto, dinheiro. Uma fatura.</p>
-        <p class="not">Não: CIOT, armazém, EDI, SPED, outro sistema.</p>
-        <button class="cta" id="abrir">Abrir o Tcargo</button>
-      </section>
-    </div>
-  `;
-}
+const ui = { tela: "historico", periodo: "hoje", menu: false, viagemId: null, de: "", ate: "" };
+
+function $(sel, el) { return (el || document).querySelector(sel); }
 
 function periodBar() {
   const chips = [
@@ -99,140 +29,240 @@ function periodBar() {
     ["mes", "Mês"],
     ["periodo", "Período"],
   ]
-    .map(
-      ([id, label]) =>
-        `<button type="button" class="chip-btn ${ui.periodo === id ? "on" : ""}" data-periodo="${id}">${id === "periodo" ? "Período" : label}</button>`,
-    )
+    .map(([id, label]) => `<button type="button" class="chip ${ui.periodo === id ? "on" : ""}" data-periodo="${id}">${label}</button>`)
     .join("");
-  const range =
+  const dates =
     ui.periodo === "periodo"
-      ? `<div class="row" style="margin-top:10px">
-           <div class="field"><label for="de">De</label><input id="de" type="date" value="${ui.de}" /></div>
-           <div class="field"><label for="ate">Até</label><input id="ate" type="date" value="${ui.ate}" /></div>
-         </div>`
+      ? `<div class="dates"><input id="de" type="date" value="${ui.de}" /><input id="ate" type="date" value="${ui.ate}" /></div>`
       : "";
-  return `<div class="chips">${chips}</div>${range}`;
+  return `<div class="period">${chips}</div>${dates}`;
 }
 
-function historicoScreen(data) {
-  const lista = data.viagens.length
-    ? data.viagens.map(viagemCard).join("")
-    : `<p class="empty">Nada nesse período.</p>`;
+function menu() {
+  const items = [
+    ["historico", "Histórico"],
+    ["viagens", "Viagens"],
+    ["notas", "Notas"],
+    ["financeiro", "Financeiro"],
+    ["acerto", "Acerto"],
+    ["frota", "Frota"],
+  ];
+  return `<nav class="nav ${ui.menu ? "open" : ""}">${items
+    .map(([id, label]) => `<button type="button" class="${ui.tela === id || (ui.tela === "viagem" && id === "viagens") ? "on" : ""}" data-tela="${id}">${label}</button>`)
+    .join("")}</nav>`;
+}
+
+function shell(name, body) {
   return `
-    <div class="wrap wrap-app">
-      <div class="top">
-        <div class="brand"><i></i> Tcargo</div>
-        <button class="linkish" id="voltar-landing">Início</button>
-      </div>
-      <h1 class="page">Histórico</h1>
-      ${periodBar()}
-      <div class="nums">
-        <div class="num"><strong>${data.numeros.viagens}</strong><span>viagens</span></div>
-        <div class="num"><strong>${money(data.numeros.cobrado)}</strong><span>cobrado</span></div>
-        <div class="num"><strong>${money(data.numeros.caiu)}</strong><span>caiu</span></div>
-        <div class="num"><strong>${money(data.numeros.deve_pro_motorista)}</strong><span>deve pro motorista</span></div>
-      </div>
-      <h2>Viagens</h2>
-      ${lista}
+    <header class="top">
+      <button type="button" class="burger" id="menu" aria-label="Menu">☰</button>
+      <div class="brand"><i></i>Tcargo</div>
+      <div class="screen-name">${name}</div>
+    </header>
+    ${menu()}
+    ${periodBar()}
+    <main class="main">${body}</main>
+    <div class="toast" id="toast"></div>
+  `;
+}
+
+function empty() {
+  return `<p class="empty">Nada nesse período.</p>`;
+}
+
+function filtered() {
+  if (ui.periodo === "periodo" && ui.de && ui.ate && ui.de > ui.ate) return [];
+  return VIAGENS;
+}
+
+function historico() {
+  const rows = filtered();
+  if (!rows.length) return shell("Histórico", empty());
+  const cobrado = rows.reduce((a, v) => a + v.valor, 0);
+  const body = `
+    <div class="nums">
+      <div class="num"><strong>${rows.length}</strong><span>viagens</span></div>
+      <div class="num"><strong>${money(cobrado)}</strong><span>cobrado</span></div>
+      <div class="num"><strong>${money(2400)}</strong><span>caiu</span></div>
+      <div class="num"><strong>${money(800)}</strong><span>deve</span></div>
+    </div>
+    <h1>Viagens</h1>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Origem</th><th>Destino</th><th>Valor</th><th>Placa</th></tr></thead>
+        <tbody>
+          ${rows
+            .map(
+              (v) =>
+                `<tr class="tap" data-viagem="${v.id}"><td>${v.origem}</td><td>${v.destino}</td><td>${money(v.valor)}</td><td>${v.placa}</td></tr>`,
+            )
+            .join("")}
+        </tbody>
+      </table>
     </div>
   `;
+  return shell("Histórico", body);
 }
 
-function viagemCard(v) {
-  return `
-    <button type="button" class="card carga tap" data-abrir-viagem="${v.id}">
-      <div class="route">${escapeHtml(v.origem)} → ${escapeHtml(v.destino)}</div>
-      <div class="meta">
-        ${money(v.valor)} · ${escapeHtml(v.placa)}
-        ${v.amostra ? `<span class="badge">amostra</span>` : ""}
-      </div>
-    </button>
-  `;
-}
-
-function detalheScreen(v) {
-  return `
-    <div class="wrap wrap-app">
-      <div class="top">
-        <button class="linkish" id="voltar-historico">Histórico</button>
-        <div class="brand"><i></i> Tcargo</div>
-      </div>
-      <h1 class="page">Viagem</h1>
-      ${v.amostra ? `<p class="badge">amostra</p>` : ""}
-      <article class="card carga">
-        <div class="field"><label>Origem</label><p class="readonly">${escapeHtml(v.origem)}</p></div>
-        <div class="field"><label>Destino</label><p class="readonly">${escapeHtml(v.destino)}</p></div>
-        <div class="field"><label>Valor</label><p class="readonly">${money(v.valor)}</p></div>
-        <div class="field"><label>Placa</label><p class="readonly">${escapeHtml(v.placa)}</p></div>
-      </article>
+function viagens() {
+  const rows = filtered();
+  if (!rows.length) return shell("Viagens", empty());
+  const body = `
+    <h1>Viagens</h1>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Origem</th><th>Destino</th><th>Valor</th><th>Placa</th><th>Motorista</th></tr></thead>
+        <tbody>
+          ${rows
+            .map(
+              (v) =>
+                `<tr class="tap" data-viagem="${v.id}"><td>${v.origem}</td><td>${v.destino}</td><td>${money(v.valor)}</td><td>${v.placa}</td><td>${v.motorista}</td></tr>`,
+            )
+            .join("")}
+        </tbody>
+      </table>
     </div>
   `;
+  return shell("Viagens", body);
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+function viagem() {
+  const v = VIAGENS.find((x) => x.id === ui.viagemId) || VIAGENS[0];
+  const body = `
+    <h1>Viagem</h1>
+    <article class="card">
+      <div class="field"><label>Origem</label><p>${v.origem}</p></div>
+      <div class="field"><label>Destino</label><p>${v.destino}</p></div>
+      <div class="field"><label>Valor</label><p>${money(v.valor)}</p></div>
+      <div class="field"><label>Placa</label><p>${v.placa}</p></div>
+      <div class="field"><label>Motorista</label><p>${v.motorista}</p></div>
+    </article>
+    <button type="button" class="btn" id="emitir">Emitir nota</button>
+    <p class="note">Mock. Não emite.</p>
+  `;
+  return shell("Viagem", body);
 }
 
-const root = document.getElementById("app");
+function notas() {
+  const body = `
+    <h1>Notas</h1>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tipo</th><th>Viagem</th><th>Status</th></tr></thead>
+        <tbody>
+          ${NOTAS.map((n) => `<tr><td>${n.tipo}</td><td>${n.viagem}</td><td>${n.status}</td></tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+    <button type="button" class="btn" id="emitir">Emitir nota</button>
+    <p class="note">Mock. Não emite. Sem portal.</p>
+  `;
+  return shell("Notas", body);
+}
 
-function bindPeriod() {
-  root.querySelectorAll("[data-periodo]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      ui.periodo = btn.dataset.periodo;
-      paint();
-    });
-  });
-  $("#de")?.addEventListener("change", (ev) => {
-    ui.de = ev.target.value;
+function financeiro() {
+  const body = `
+    <div class="nums">
+      <div class="num"><strong>${money(8100)}</strong><span>cobrado</span></div>
+      <div class="num"><strong>${money(2400)}</strong><span>caiu</span></div>
+    </div>
+    <h1>Financeiro</h1>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Viagem</th><th>Cobrado</th><th>Caiu</th></tr></thead>
+        <tbody>
+          <tr><td>Americana → Campinas</td><td>${money(2400)}</td><td>${money(2400)}</td></tr>
+          <tr><td>Limeira → Santos</td><td>${money(3800)}</td><td>${money(0)}</td></tr>
+          <tr><td>Piracicaba → Jundiaí</td><td>${money(1900)}</td><td>${money(0)}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+  return shell("Financeiro", body);
+}
+
+function acerto() {
+  const body = `
+    <h1>Acerto</h1>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Motorista</th><th>Viagens</th><th>Deve</th></tr></thead>
+        <tbody>
+          <tr><td>José Silva</td><td>2</td><td>${money(500)}</td></tr>
+          <tr><td>Ana Costa</td><td>1</td><td>${money(300)}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+  return shell("Acerto", body);
+}
+
+function frota() {
+  const body = `
+    <h1>Frota</h1>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Placa</th></tr></thead>
+        <tbody>
+          ${FROTAS.map((f) => `<tr><td>${f.placa}</td></tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+    <p class="note">1 a 5 placas.</p>
+  `;
+  return shell("Frota", body);
+}
+
+function paint() {
+  const root = document.getElementById("app");
+  const view = {
+    historico,
+    viagens,
+    viagem,
+    notas,
+    financeiro,
+    acerto,
+    frota,
+  }[ui.tela];
+  root.innerHTML = view();
+
+  $("#menu").onclick = () => {
+    ui.menu = !ui.menu;
     paint();
-  });
-  $("#ate")?.addEventListener("change", (ev) => {
-    ui.ate = ev.target.value;
-    paint();
-  });
-}
-
-async function paint() {
-  if (ui.tela === "landing") {
-    root.innerHTML = landing();
-    $("#abrir").addEventListener("click", () => {
-      ui.tela = "historico";
-      paint();
-    });
-    return;
-  }
-
-  if (ui.tela === "viagem") {
-    const v = await api(`/api/viagens/${ui.viagemId}`);
-    root.innerHTML = detalheScreen(v);
-    $("#voltar-historico").addEventListener("click", () => {
-      ui.tela = "historico";
+  };
+  root.querySelectorAll("[data-tela]").forEach((btn) => {
+    btn.onclick = () => {
+      ui.tela = btn.dataset.tela;
+      ui.menu = false;
       ui.viagemId = null;
       paint();
-    });
-    return;
-  }
-
-  const data = await api(`/api/historico${qs()}`);
-  root.innerHTML = historicoScreen(data);
-  $("#voltar-landing").addEventListener("click", () => {
-    ui.tela = "landing";
-    paint();
+    };
   });
-  bindPeriod();
-  root.querySelectorAll("[data-abrir-viagem]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      ui.viagemId = Number(btn.dataset.abrirViagem);
-      ui.tela = "viagem";
+  root.querySelectorAll("[data-periodo]").forEach((btn) => {
+    btn.onclick = () => {
+      ui.periodo = btn.dataset.periodo;
       paint();
-    });
+    };
   });
+  $("#de") && ($("#de").onchange = (e) => { ui.de = e.target.value; paint(); });
+  $("#ate") && ($("#ate").onchange = (e) => { ui.ate = e.target.value; paint(); });
+  root.querySelectorAll("[data-viagem]").forEach((row) => {
+    row.onclick = () => {
+      ui.viagemId = Number(row.dataset.viagem);
+      ui.tela = "viagem";
+      ui.menu = false;
+      paint();
+    };
+  });
+  const emitir = $("#emitir");
+  if (emitir) {
+    emitir.onclick = () => {
+      const t = $("#toast");
+      t.textContent = "Não emitiu. Mock.";
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2200);
+    };
+  }
 }
 
-paint().catch((err) => {
-  root.innerHTML = `<div class="wrap"><p class="err">${escapeHtml(err.message)}</p></div>`;
-});
+paint();
